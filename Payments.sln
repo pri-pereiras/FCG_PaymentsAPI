@@ -1,0 +1,42 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payments.Domain", "src\Payments.Domain\Payments.Domain.csproj", "{F643A1F5-50B4-49A8-A032-C2110F110001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payments.Application", "src\Payments.Application\Payments.Application.csproj", "{F643A1F5-50B4-49A8-A032-C2110F110002}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payments.Infrastructure", "src\Payments.Infrastructure\Payments.Infrastructure.csproj", "{F643A1F5-50B4-49A8-A032-C2110F110003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payments.API", "src\Payments.API\Payments.API.csproj", "{F643A1F5-50B4-49A8-A032-C2110F110004}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payments.Domain.Tests", "tests\Payments.Domain.Tests\Payments.Domain.Tests.csproj", "{F643A1F5-50B4-49A8-A032-C2110F110005}"
+EndProject
+Global
+GlobalSection(SolutionConfigurationPlatforms) = preSolution
+Debug|Any CPU = Debug|Any CPU
+Release|Any CPU = Release|Any CPU
+EndGlobalSection
+GlobalSection(ProjectConfigurationPlatforms) = postSolution
+{F643A1F5-50B4-49A8-A032-C2110F110001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110001}.Release|Any CPU.Build.0 = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110002}.Release|Any CPU.Build.0 = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110003}.Release|Any CPU.Build.0 = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110004}.Release|Any CPU.Build.0 = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110005}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110005}.Debug|Any CPU.Build.0 = Debug|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110005}.Release|Any CPU.ActiveCfg = Release|Any CPU
+{F643A1F5-50B4-49A8-A032-C2110F110005}.Release|Any CPU.Build.0 = Release|Any CPU
+EndGlobalSection
+EndGlobal
