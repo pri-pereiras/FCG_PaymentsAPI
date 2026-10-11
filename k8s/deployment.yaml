@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+spec:
+  replicas: 1 # SQLite + PVC único: não escalar horizontalmente nessa versão de demonstração
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+    spec:
+      securityContext:
+        fsGroup: 1654
+      containers:
+        - name: payments-api
+          image: payments-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: payments-api-config
+            - secretRef:
+                name: payments-api-secret
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: payments-api-data
