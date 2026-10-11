@@ -1,147 +1,52 @@
-> **Orquestração:** o `docker-compose.yml` da Fase 2 foi centralizado no quinto repositório `FCG-Orchestration`. O `Dockerfile` e a pasta `k8s/` continuam neste repositório conforme exigência do enunciado.
+# FCG PaymentsAPI — Clean Architecture (.NET 8)
 
-# PaymentsAPI — FIAP Cloud Games / Tech Challenge Fase 2
+Microsserviço de pagamentos simulados. Consome `OrderPlacedEvent` do CatalogAPI no RabbitMQ; persiste o resultado e publica `PaymentProcessedEvent` para CatalogAPI e NotificationsAPI.
 
-Microsserviço independente em **.NET 8** que recebe `OrderPlacedEvent` via RabbitMQ, simula pagamento, persiste o resultado e publica `PaymentProcessedEvent` para Catálogo e Notificações.
-
-## Relação com a Fase 1
-
-O projeto original usava uma aplicação monolítica `TechChallenge` (camadas Domain, Infrastructure e API) e o método `UserGameService.AddGameToLibraryAsync()` incluía jogos imediatamente na biblioteca. Na Fase 2, o `CatalogAPI` **não deve inserir na biblioteca antes do evento Approved**.
-
-## Estrutura
+## Camadas e dependências
 
 ```text
-PaymentsAPI/
-├── src/PaymentsAPI/
-│   ├── Contracts/              # Eventos (mesmo namespace e formato nos outros serviços)
-│   ├── Consumers/              # Recebe OrderPlacedEvent
-│   ├── Data/                   # SQLite: pagamentos e resultados pendentes
-│   ├── Options/                # Regra simulada parametrizada
-│   ├── Services/               # Publicação assíncrona de PaymentProcessedEvent
-│   ├── Program.cs              # DI, MassTransit, endpoints, Swagger
-│   ├── appsettings.json
-│   └── PaymentsAPI.csproj
-├── k8s/                       # Deployment, Service, ConfigMap, Secret de exemplo, PVC
-├── Dockerfile
-└── README.md  # execução via ../FCG-Orchestration/docker-compose.yml
+src/
+  Payments.Domain/           # Entidade Payment e status; sem dependências externas
+  Payments.Application/      # Casos de uso, interfaces/ports, contratos de eventos
+  Payments.Infrastructure/   # EF Core/SQLite, RabbitMQ/MassTransit, dispatcher outbox
+  Payments.API/              # HTTP, Swagger, DI e composição da aplicação
 ```
 
-## Contratos obrigatórios para integração
+Dependências: `API -> Infrastructure -> Application -> Domain`. Infrastructure implementa as interfaces definidas em Application. Domain não conhece mensageria nem banco. **FCG-Orchestration é o quinto repositório**, centraliza `docker-compose.yml`, RabbitMQ e scripts de implantação. Cada API conserva seu `Dockerfile` e a pasta `/k8s` exigida pelo trabalho.
 
-Este serviço usa `Fcg.Contracts` com tipos C# **idênticos** nos serviços envolvidos. Em um projeto real, recomenda-se publicar um pacote NuGet versionado de contratos; cada microsserviço mantém o seu repositório independente.
+## Regras da simulação
 
-```csharp
-namespace Fcg.Contracts;
-public record OrderPlacedEvent(Guid OrderId, int UserId, int GameId, decimal Price);
-public record PaymentProcessedEvent(
-    Guid OrderId, int UserId, int GameId, decimal Price,
-    string Status, DateTime ProcessedAtUtc, string? Reason);
-```
-
-- `OrderId` é um `Guid` **único por tentativa de compra**, produzido pelo Catálogo. A Fase 2 exige `UserId`, `GameId` e `Price`; `OrderId` foi acrescentado para rastreamento e idempotência.
-- `CatalogAPI`: publicar `OrderPlacedEvent` ao iniciar uma compra; consumir `PaymentProcessedEvent`; se `Status == "Approved"`, inserir na biblioteca **apenas uma vez por OrderId**. Rejected não adiciona o jogo.
-- `NotificationsAPI`: consumir `PaymentProcessedEvent`; se Approved, registrar a simulação do e-mail uma única vez por OrderId.
-- O RabbitMQ/MassTransit cria exchanges por tipo de mensagem e vincula a fila `payments-order-placed` ao evento consumido; os consumidores do resultado devem ter **filas separadas** entre si (pub/sub), não uma fila compartilhada.
-
-## Simulação do pagamento
-
-Regras **sugeridas para esta implementação**, não definidas pelo enunciado:
 - `0 <= Price <= PaymentSimulation:MaximumApprovedAmount` → `Approved`.
-- Valor negativo ou preço acima do limite → `Rejected`.
-- O padrão é 1000, e pode ser alterado por configuração.
-- `UserId`, `GameId` e `OrderId` inválidos geram falha técnica; não são uma rejeição de cartão.
-- Não existe gateway real, cartão, PIX ou cobrança.
+- Outros valores → `Rejected` (preço negativo recebe motivo específico).
+- Chave `OrderId` é única: reentregas são idempotentes para registro do pagamento.
+- O dispatcher publica eventos pendentes em loop; modelo `at-least-once`: CatalogAPI/NotificationsAPI devem deduplicar por `OrderId`.
+- Não há cobrança real. SQLite + `EnsureCreated` servem ao MVP; para produção usar migrations, banco transacional escalável e outbox com coordenação entre instâncias.
 
-## Executar com Docker Compose
+## Contratos MassTransit
 
-Requisitos: Docker com Compose. A partir do repositório irmão `FCG-Orchestration`:
+`Fcg.Contracts.OrderPlacedEvent(Guid OrderId, int UserId, int GameId, decimal Price)`.
 
-```bash
-cd ../FCG-Orchestration
-cp .env.example .env  # No PowerShell: Copy-Item .env.example .env
-docker compose up --build -d
-docker compose logs -f payments-api
-```
+`Fcg.Contracts.PaymentProcessedEvent(Guid OrderId, int UserId, int GameId, decimal Price, string Status, DateTime ProcessedAtUtc, string? Reason)`.
 
-- Swagger: http://localhost:8082/swagger
-- Saúde: http://localhost:8082/health
-- RabbitMQ UI: http://localhost:15672 (credenciais definidas no arquivo .env da orquestração)
-- Consulta: `GET http://localhost:8082/api/payments/{orderId}`
+Os consumidores/publicadores nos outros microsserviços devem usar o mesmo **namespace, nome e tipos** dos contratos. Idealmente manter pacote compartilhado versionado (sem compartilhamento da lógica de domínio).
 
-**Importante:** o quinto repositório sobe atualmente PaymentsAPI + RabbitMQ. O grupo deve adicionar UsersAPI, CatalogAPI e NotificationsAPI para atender ao requisito de execução integral.
+## Como executar
 
-## Executar com dotnet local
+Ponha os repositórios lado a lado (`PaymentsAPI`, `FCG-Orchestration`) e rode `docker compose up --build -d` dentro de `FCG-Orchestration` (ajuste a pasta do projeto conforme nome de clone). Endpoint: `http://localhost:8082/health` e consulta `GET /api/payments/{orderId}`. RabbitMQ management: `http://localhost:15672`.
 
-1. Em `../FCG-Orchestration`, subir o RabbitMQ: `docker compose up -d rabbitmq`. Ao executar a API localmente, configure as credenciais para coincidir com o arquivo `.env`.
-2. `dotnet run --project src/PaymentsAPI/PaymentsAPI.csproj --urls http://localhost:8082`.
-3. A API criará `./data/payments.db` relativo ao diretório de execução.
+Ou no diretório deste repositório: `dotnet restore Payments.sln` e `dotnet run --project src/Payments.API` (necessário RabbitMQ acessível na configuração).
 
-Não há endpoint público de pagamento: o gatilho é **somente o evento recebido**.
+## Configuração
 
-## Publicar evento de teste
+- `ConnectionStrings__PaymentsDb`: connection string do SQLite (`Data Source=/app/data/payments.db` em Docker).
+- `RabbitMq__Host`, `RabbitMq__Username`, `RabbitMq__Password`: broker e credenciais.
+- `RabbitMq__OrderQueue`: fila de pedidos (padrão `payments-order-placed`).
+- `PaymentSimulation__MaximumApprovedAmount`: valor máximo de aprovação (padrão 1000).
 
-O modo mais fiel é usar o CatalogAPI integrado. Alternativamente, crie um pequeno produtor .NET referenciando `MassTransit.RabbitMQ` e os contratos de `src/PaymentsAPI/Contracts/`:
+## Kubernetes
 
-```csharp
-// Após configurar MassTransit e injetar IPublishEndpoint no produtor:
-var orderId = Guid.NewGuid();
-await publisher.Publish(new OrderPlacedEvent(orderId, 1, 2, 79.90m));
-// Checar GET /api/payments/{orderId} e os logs do resultado.
-```
+O diretório `k8s` possui `deployment.yaml`, `service.yaml`, `configmap.yaml`, `pvc.yaml`, `secret.example.yaml`. Crie o Secret sem commitar credenciais. Para execução local, o script de orquestração aplica manifests e exige a imagem `payments-api:local` no cluster (no Kind, carregue via `kind load docker-image payments-api:local`). Configuração do RabbitMQ deve coincidir com Secret do broker. O Deployment limita a uma réplica pelo uso de SQLite e PVC.
 
-Também envie um pedido com `Price = 1001m` para testar `Rejected`. O `Price` real deve vir do catálogo confiável do servidor e não diretamente do corpo da solicitação do cliente.
+## Limitações e próximos passos
 
-## Variáveis de ambiente
-
-| Variável | Finalidade | Exemplo |
-|---|---|---|
-| `RabbitMq__Host` | DNS do broker | `rabbitmq` |
-| `RabbitMq__Username` | Usuário do broker | `guest` (somente local) |
-| `RabbitMq__Password` | Senha do broker | secret |
-| `RabbitMq__OrderQueue` | Fila consumidora | `payments-order-placed` |
-| `ConnectionStrings__PaymentsDb` | SQLite local | `Data Source=/app/data/payments.db` |
-| `PaymentSimulation__MaximumApprovedAmount` | Limite da simulação | `1000` |
-
-## Kubernetes local
-
-Os manifestos em `k8s/` pressupõem que **RabbitMQ já esteja instalado e acessível pelo Service `rabbitmq`**, com usuário/senha conhecidos, e que a imagem `payments-api:local` esteja disponível no cluster.
-
-```bash
-docker build -t payments-api:local .
-# Kind: kind load docker-image payments-api:local --name <nome-do-cluster>
-# Minikube: minikube image load payments-api:local
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/pvc.yaml
-# Ajuste o exemplo com credenciais reais do broker local antes de aplicar:
-kubectl apply -f k8s/secret.example.yaml
-kubectl apply -f k8s/service.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl get pods
-kubectl logs deployment/payments-api
-kubectl port-forward service/payments-api 8082:80
-```
-
-Para `kubectl apply -f k8s/` funcionar como demonstrado no enunciado, configure as credenciais e o broker do cluster. **Não comite Secrets reais**: `secret.example.yaml` é somente modelo de laboratório. SQLite usa PVC e **uma réplica**: para escalabilidade real, trocar por banco externo e mecanismo de outbox transacional próprio para múltiplas réplicas.
-
-## Confiabilidade e limitações
-
-- `OrderId` é chave primária. Redelivery de uma compra não a processa outra vez.
-- O evento de saída é persistido como pendente antes da publicação; um worker publica e marca como enviado após sucesso (outbox simplificada).
-- Se a publicação ocorrer e o processo morrer antes de marcar a linha, `PaymentProcessedEvent` pode ser publicado novamente. **Catálogo e Notificações precisam deduplicar por OrderId**.
-- Nesta implementação MVP, o endpoint `/health` apenas confirma que o processo HTTP está vivo, **não** verifica RabbitMQ/banco.
-- O consumidor não autentica o produtor por conta própria: configurar credenciais/ACL e isolamento do broker, e nunca confiar em preço vindo de um cliente final.
-- Para ambiente de produção: migrations, banco remoto, estratégia transacional de outbox, observabilidade, autorização no endpoint de consulta e testes automatizados de integração.
-
-## Checklist da Fase 2
-
-- [x] Projeto independente .NET 8
-- [x] Consumo de `OrderPlacedEvent`
-- [x] Simulação `Approved`/`Rejected`
-- [x] Publicação de `PaymentProcessedEvent`
-- [x] Dockerfile multi-stage
-- [x] Deployment, Service, ConfigMap, Secret (exemplo), PVC
-- [x] README com instruções e variáveis
-- [ ] Integrar contratos e filas nos serviços CatalogAPI / NotificationsAPI
-- [ ] Integrar Compose dos quatro serviços
-- [ ] Testar no Docker e Kubernetes locais
-- [ ] Gravar vídeo de demonstração e publicar repositório Git individual
+Ainda é preciso integrar CatalogAPI e NotificationsAPI, executar build/testes com .NET e Docker em seu computador e confirmar os fluxos end-to-end. O endpoint `/health` apenas confirma processo HTTP; não testa conectividade com broker. Em produção, adicionar testes automatizados, migrations, observabilidade, proteção do endpoint de consulta e outbox transacional em ambiente distribuído.
