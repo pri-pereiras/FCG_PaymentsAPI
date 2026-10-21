@@ -18,7 +18,7 @@ spec:
         fsGroup: 1654
       containers:
         - name: payments-api
-          image: fcg-payments-api:1.0
+          image: fcg-payments-api:2.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -32,7 +32,7 @@ spec:
               mountPath: /app/data
           readinessProbe:
             httpGet:
-              path: /health
+              path: /ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10

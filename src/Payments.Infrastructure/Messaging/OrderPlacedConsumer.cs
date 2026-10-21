@@ -10,7 +10,11 @@ public sealed class OrderPlacedConsumer(ProcessOrderHandler handler,
 {
     public async Task Consume(ConsumeContext<OrderPlacedEvent> context)
     {
-        await handler.HandleAsync(context.Message, options.Value.MaximumApprovedAmount, context.CancellationToken);
-        logger.LogInformation("Pedido {OrderId} recebido/processado", context.Message.OrderId);
+        var correlationId = context.CorrelationId ?? context.Message.OrderId;
+        using (logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId, ["OrderId"] = context.Message.OrderId }))
+        {
+            await handler.HandleAsync(context.Message, options.Value, correlationId, context.CancellationToken);
+            logger.LogInformation("OrderPlacedEvent processado: {OrderId}", context.Message.OrderId);
+        }
     }
 }

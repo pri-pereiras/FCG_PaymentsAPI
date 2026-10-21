@@ -6,6 +6,7 @@ using Payments.Application.Abstractions;
 using Payments.Application.Options;
 using Payments.Application.UseCases.GetPayment;
 using Payments.Application.UseCases.ProcessOrder;
+using Payments.Infrastructure.Gateways;
 using Payments.Infrastructure.Messaging;
 using Payments.Infrastructure.Persistence;
 namespace Payments.Infrastructure;
@@ -13,13 +14,13 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPaymentInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        services.AddOptions<PaymentSimulationOptions>()
-            .Bind(config.GetSection("PaymentSimulation"))
-            .Validate(o => o.MaximumApprovedAmount >= 0, "MaximumApprovedAmount deve ser >= 0")
-            .ValidateOnStart();
+        services.AddOptions<PaymentSimulationOptions>().Bind(config.GetSection("PaymentSimulation"))
+            .Validate(o => o.MaximumApprovedAmount >= 0 && o.MaximumAttempts > 0 && o.RetryDelayMilliseconds >= 0 && o.GatewayDelayMilliseconds >= 0,
+                "Configuração inválida do gateway simulado.").ValidateOnStart();
         services.AddDbContext<PaymentsDbContext>(o => o.UseSqlite(config.GetConnectionString("PaymentsDb")
             ?? throw new InvalidOperationException("ConnectionStrings:PaymentsDb não configurada")));
         services.AddScoped<IPaymentRepository, EfPaymentRepository>();
+        services.AddScoped<IPaymentGateway, FakePaymentGateway>();
         services.AddScoped<ProcessOrderHandler>();
         services.AddScoped<GetPaymentHandler>();
         services.AddScoped<IDomainEventPublisher, MassTransitEventPublisher>();
