@@ -1,39 +1,16 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Payments.Application.Abstractions;
 using Payments.Application.UseCases.GetPayment;
 using Payments.Infrastructure;
 using Payments.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPaymentInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
-var jwtKey = builder.Configuration["Jwt:Key"];
-var jwtEnabled = !string.IsNullOrWhiteSpace(jwtKey);
-if (!jwtEnabled && !builder.Environment.IsDevelopment())
-    throw new InvalidOperationException("Jwt:Key é obrigatório fora de Development.");
-if (jwtEnabled)
-{
-    if (Encoding.UTF8.GetByteCount(jwtKey!) < 32)
-        throw new InvalidOperationException("Jwt:Key precisa de ao menos 32 bytes.");
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
-    {
-        o.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true, ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidateAudience = true, ValidAudience = builder.Configuration["Jwt:Audience"],
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
-        };
-    });
-    builder.Services.AddAuthorization();
-}
+
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
@@ -47,7 +24,6 @@ using (var scope = app.Services.CreateScope())
     await db.Database.EnsureCreatedAsync();
 }
 app.UseExceptionHandler();
-if (jwtEnabled) { app.UseAuthentication(); app.UseAuthorization(); }
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.MapHealthChecks("/health"); // liveness
 app.MapGet("/ready", async (PaymentsDbContext db, CancellationToken ct) =>
@@ -62,8 +38,7 @@ var paymentEndpoint = app.MapGet("/api/payments/{orderId:guid}", async (Guid ord
         payment.Reason, payment.CreatedAtUtc, payment.ProcessedAtUtc, payment.AttemptCount
     });
 }).WithTags("Payments");
-if (jwtEnabled) paymentEndpoint.RequireAuthorization();
-// Endpoints diagnósticos disponíveis apenas em Development. Não expor informações financeiras sem JWT.
+
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/api/payments/{orderId:guid}/attempts", async (Guid orderId, IPaymentRepository repo, CancellationToken ct) =>

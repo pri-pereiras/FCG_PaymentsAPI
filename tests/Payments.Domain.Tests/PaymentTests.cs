@@ -19,7 +19,7 @@ public sealed class PaymentTests
     [Fact]
     public void Lifecycle_Rejected_StoresFailureCode()
     {
-        var payment = Payment.Create(Guid.NewGuid(), Guid.Empty, 1, 2, 777.01m);
+        var payment = Payment.Create(Guid.NewGuid(), Guid.Empty, 1, 2, 550m);
         payment.StartProcessing();
         payment.Finish(false, null, "INSUFFICIENT_FUNDS", "Saldo insuficiente", 1);
         Assert.Equal(PaymentStatus.Rejected, payment.Status);
