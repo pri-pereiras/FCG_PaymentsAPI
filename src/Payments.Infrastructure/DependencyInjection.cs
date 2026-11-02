@@ -1,3 +1,4 @@
+using Fcg.Contracts;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -87,6 +88,13 @@ public static class DependencyInjection
                 });
                 cfg.ReceiveEndpoint(config["RabbitMq:OrderQueue"] ?? "payments-order-placed", e =>
                 {
+                    e.ConfigureConsumeTopology=false;
+                    e.UseRawJsonSerializer(RawSerializerOptions.All);
+                    e.Bind("FCG_CatalogAPI:OrderPlacedEvent", s =>
+                    {
+                        s.ExchangeType = "fanout";
+                    });
+                    cfg.MessageTopology.GetMessageTopology<OrderPlacedEvent>().SetEntityName("FCG_CatalogAPI:OrderPlacedEvent");
                     e.UseMessageRetry(r => r.Intervals(500, 1000, 3000));
                     e.PrefetchCount = 8;
                     e.ConfigureConsumer<OrderPlacedConsumer>(context);
