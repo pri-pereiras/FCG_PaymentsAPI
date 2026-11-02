@@ -86,6 +86,9 @@ public static class DependencyInjection
                     h.Username(config["RabbitMq:Username"] ?? "guest");
                     h.Password(config["RabbitMq:Password"] ?? "guest");
                 });
+
+                cfg.Message<Fcg.Contracts.PaymentProcessedEvent>(m => m.SetEntityName("FCG_PaymentsAPI:PaymentProcessedEvent"));
+
                 cfg.ReceiveEndpoint(config["RabbitMq:OrderQueue"] ?? "payments-order-placed", e =>
                 {
                     e.ConfigureConsumeTopology=false;
