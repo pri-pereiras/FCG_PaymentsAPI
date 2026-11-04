@@ -86,19 +86,42 @@ public static class DependencyInjection
                     h.Username(config["RabbitMq:Username"] ?? "guest");
                     h.Password(config["RabbitMq:Password"] ?? "guest");
                 });
-                cfg.ReceiveEndpoint(config["RabbitMq:OrderQueue"] ?? "payments-order-placed", e =>
-                {
-                    e.ConfigureConsumeTopology=false;
-                    e.UseRawJsonSerializer(RawSerializerOptions.All);
-                    e.Bind("FCG_CatalogAPI:OrderPlacedEvent", s =>
+
+                
+                cfg.UseRawJsonSerializer(
+                    RawSerializerOptions.AddTransportHeaders |
+                    RawSerializerOptions.CopyHeaders);
+
+                cfg.Message<PaymentProcessedEvent>(m =>
+                    m.SetEntityName("FCG_PaymentsAPI:PaymentProcessedEvent"));
+
+
+                cfg.ReceiveEndpoint(
+                    config["RabbitMq:OrderQueue"] ?? "payments-order-placed",
+                    e =>
                     {
-                        s.ExchangeType = "fanout";
+                        e.ConfigureConsumeTopology = false;
+
+                        // Recebe JSON bruto, sem exigir namespace compartilhado
+                        e.UseRawJsonDeserializer(
+                            RawSerializerOptions.All,
+                            isDefault: true);
+
+                        // Escuta a exchange publicada pelo CatalogAPI
+                        e.Bind("FCG_CatalogAPI:OrderPlacedEvent", s =>
+                        {
+                            s.ExchangeType = "fanout";
+                        });
+
+                        e.UseMessageRetry(r =>
+                            r.Intervals(500, 1000, 3000));
+
+                        e.PrefetchCount = 8;
+
+                        // Consumer do PaymentsAPI
+                        e.ConfigureConsumer<OrderPlacedConsumer>(context);
                     });
-                    cfg.MessageTopology.GetMessageTopology<OrderPlacedEvent>().SetEntityName("FCG_CatalogAPI:OrderPlacedEvent");
-                    e.UseMessageRetry(r => r.Intervals(500, 1000, 3000));
-                    e.PrefetchCount = 8;
-                    e.ConfigureConsumer<OrderPlacedConsumer>(context);
-                });
+
             });
         });
         services.AddHostedService<PaymentEventDispatcher>();

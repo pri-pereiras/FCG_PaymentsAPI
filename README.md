@@ -187,11 +187,11 @@ Na raiz do `FCG_PaymentsAPI`, substitua `SEU_USUARIO` pelo usuário/organizaçã
 dotnet test Payments.sln --no-build
 docker build -t fcg-payments-api:2.0 -f Dockerfile .
 docker login -u pripereiras
-docker tag fcg-payments-api:2.0 pripereiras/fcg-payments-api:2.1
-docker push pripereiras/fcg-payments-api:2.1
+docker tag fcg-payments-api:2.0 pripereiras/fcg-payments-api:2.2
+docker push pripereiras/fcg-payments-api:2.2
 ```
 
-A imagem de entrega é **`pripereiras/fcg-payments-api:2.1`**. A tag deve coincidir com a referência usada no Compose e nos manifestos do `FCG-Orchestration`. O build local da versão 2.0 foi concluído; o push ao Docker Hub ainda precisa ser confirmado. Para conferir localmente:
+A imagem de entrega é **`pripereiras/fcg-payments-api:2.2`**. A tag deve coincidir com a referência usada no Compose e nos manifestos do `FCG-Orchestration`. O build local da versão 2.0 foi concluído; o push ao Docker Hub ainda precisa ser confirmado. Para conferir localmente:
 
 ```powershell
 docker images pripereiras/fcg-payments-api
@@ -314,18 +314,18 @@ O build local `fcg-payments-api:2.0` já foi realizado. Não há necessidade de 
 
 ```powershell
 docker login -u pripereiras
-docker tag fcg-payments-api:2.0 pripereiras/fcg-payments-api:2.1
-docker push pripereiras/fcg-payments-api:2.1
+docker tag fcg-payments-api:2.0 pripereiras/fcg-payments-api:2.2
+docker push pripereiras/fcg-payments-api:2.2
 ```
 
-Verifique a tag em <https://hub.docker.com/r/pripereiras/fcg-payments-api/tags>. Para confirmar que a imagem está disponível para novos ambientes, o ideal é realizar um `docker pull pripereiras/fcg-payments-api:2.1` em um ambiente sem a imagem local ou conferir a tag/digest no Docker Hub.
+Verifique a tag em <https://hub.docker.com/r/pripereiras/fcg-payments-api/tags>. Para confirmar que a imagem está disponível para novos ambientes, o ideal é realizar um `docker pull pripereiras/fcg-payments-api:2.2` em um ambiente sem a imagem local ou conferir a tag/digest no Docker Hub.
 
 ### Atualizar o FCG-Orchestration
 
 O `Deployment` do PaymentsAPI, **apenas no repositório `FCG-Orchestration`**, deve referenciar a imagem:
 
 ```yaml
-image: pripereiras/fcg-payments-api:2.1
+image: pripereiras/fcg-payments-api:2.2
 imagePullPolicy: Always
 ```
 
