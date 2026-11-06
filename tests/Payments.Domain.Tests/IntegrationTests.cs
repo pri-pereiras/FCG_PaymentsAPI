@@ -1,4 +1,4 @@
-
+using Microsoft.Extensions.Logging.Abstractions;
 using Fcg.Contracts;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -98,7 +98,10 @@ public sealed class IntegrationTests
             Options.Create(config));
 
         var handler = new ProcessOrderHandler(
-            repository, gateway);
+            repository,
+            gateway,
+            NullLogger<ProcessOrderHandler>.Instance
+        );
 
         var order = new OrderPlacedEvent(
             Guid.NewGuid(),
@@ -132,12 +135,12 @@ public sealed class IntegrationTests
 
         Assert.Equal(1, payment.AttemptCount);
 
-        // Não pode duplicar o pagamento
+        // Nï¿½o pode duplicar o pagamento
         Assert.Equal(
             1,
             await db.Payments.CountAsync());
 
-        // Não pode duplicar a mensagem Outbox
+        // Nï¿½o pode duplicar a mensagem Outbox
         Assert.Equal(
             1,
             await db.OutboxMessages.CountAsync());
@@ -178,7 +181,10 @@ public sealed class IntegrationTests
             Options.Create(config));
 
         var handler = new ProcessOrderHandler(
-            repository, gateway);
+            repository,
+            gateway,
+            NullLogger<ProcessOrderHandler>.Instance
+        );
 
         var order = new OrderPlacedEvent(
             Guid.NewGuid(),
@@ -193,8 +199,8 @@ public sealed class IntegrationTests
                 order.OrderId,
                 CancellationToken.None));
 
-        // Não registra um pagamento rejeitado
-        // quando houve apenas falha técnica.
+        // Nï¿½o registra um pagamento rejeitado
+        // quando houve apenas falha tï¿½cnica.
         Assert.Equal(
             0,
             await db.Payments.CountAsync());
