@@ -1,17 +1,22 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Fcg.Contracts;
 using Payments.Application.Abstractions;
 using Payments.Application.Options;
 using Payments.Domain.Entities;
 namespace Payments.Application.UseCases.ProcessOrder;
-public sealed class ProcessOrderHandler(IPaymentRepository repository, IPaymentGateway gateway)
+public sealed class ProcessOrderHandler(IPaymentRepository repository, IPaymentGateway gateway, ILogger<ProcessOrderHandler> logger)
 {
     public async Task HandleAsync(OrderPlacedEvent order, PaymentSimulationOptions options, Guid correlationId, CancellationToken ct)
     {
         if (order.OrderId == Guid.Empty || order.UserId <= 0 || order.GameId <= 0 || order.Price < 0 || decimal.Round(order.Price, 2) != order.Price)
             throw new ArgumentException("Pedido inválido.");
         // Chave única em OrderId também protege gravações concorrentes.
-        if (await repository.GetByOrderIdAsync(order.OrderId, ct) is not null) return;
+        if (await repository.GetByOrderIdAsync(order.OrderId, ct) is not null)
+        {
+            logger.LogDebug("Pagamento já registrado, ignorando duplicidade. OrderId: {OrderId}", order.OrderId);
+            return;
+        }
         var payment = Payment.Create(order.OrderId, correlationId, order.UserId, order.GameId, order.Price);
         payment.StartProcessing();
         var attempts = new List<PaymentAttempt>();
@@ -27,6 +32,8 @@ public sealed class ProcessOrderHandler(IPaymentRepository repository, IPaymentG
             catch (TemporaryGatewayException ex)
             {
                 attempts.Add(PaymentAttempt.Create(order.OrderId, i, "TemporaryFailure", ex.Message));
+                logger.LogWarning("Falha temporária no gateway. OrderId: {OrderId}, Tentativa: {Attempt}/{MaxAttempts}, Motivo: {Reason}",
+                    order.OrderId, i, Math.Max(1, options.MaximumAttempts), ex.Message);
                 if (i == Math.Max(1, options.MaximumAttempts)) throw; // RabbitMQ fará retry / fila _error.
                 await Task.Delay(TimeSpan.FromMilliseconds(options.RetryDelayMilliseconds * i), ct);
             }
@@ -37,5 +44,7 @@ public sealed class ProcessOrderHandler(IPaymentRepository repository, IPaymentG
         var integrationEvent = new PaymentProcessedEvent(payment.OrderId, payment.UserId, payment.GameId,
             payment.Price, payment.Status, payment.ProcessedAtUtc!.Value, payment.Reason);
         await repository.SaveResultAsync(payment, attempts, JsonSerializer.Serialize(integrationEvent), ct);
+        logger.LogInformation("Pagamento registrado. OrderId: {OrderId}, Status: {Status}, Tentativas: {AttemptCount}, Motivo: {Reason}",
+            payment.OrderId, payment.Status, attempts.Count, payment.Reason);
     }
 }
