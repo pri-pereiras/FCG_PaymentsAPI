@@ -3,8 +3,14 @@ using Payments.Application.Abstractions;
 using Payments.Application.UseCases.GetPayment;
 using Payments.Infrastructure;
 using Payments.Infrastructure.Persistence;
+using Serilog;
+using Payments.API.Logging;
 
+Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
+try
+{
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UsePaymentsLogging();
 builder.Services.AddPaymentInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -23,6 +29,7 @@ using (var scope = app.Services.CreateScope())
     }
     await db.Database.EnsureCreatedAsync();
 }
+app.UsePaymentsRequestLogging();
 app.UseExceptionHandler();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.MapHealthChecks("/health"); // liveness
@@ -55,4 +62,14 @@ if (app.Environment.IsDevelopment())
         """, "text/html")).WithTags("Diagnostics");
 }
 app.Run();
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "Falha na inicialização do FCG_PaymentsAPI");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 public partial class Program { }

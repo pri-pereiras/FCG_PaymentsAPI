@@ -27,13 +27,13 @@ public sealed class PaymentEventDispatcher(IServiceScopeFactory scopes, ILogger<
                         {
                             await publisher.PublishAsync(message, stoppingToken);
                             await repository.MarkPublishedAsync(item, stoppingToken);
-                            logger.LogInformation("PaymentProcessedEvent publicado: {OrderId}", item.OrderId);
+                            logger.LogInformation("PaymentProcessedEvent publicado. OrderId: {OrderId}, Status: {Status}", item.OrderId, message.Status);
                         }
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Falha ao entregar Outbox para pedido {OrderId}", item.OrderId);
+                        logger.LogError(ex, "Falha ao publicar PaymentProcessedEvent. OrderId: {OrderId}", item.OrderId);
                         await repository.MarkFailedAsync(item, ex.Message, stoppingToken);
                     }
                 }
